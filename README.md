@@ -13,7 +13,8 @@ rewritten to look good in retrospect.
 | | |
 |---|---|
 | Site | https://kalita.tech |
-| Panel | https://app.kalita.tech — Overview is public; sign in with a wallet (MetaMask/Phantom) or an email link for your own lists and API keys |
+| Panel | https://app.kalita.tech — Overview, candidates (5 000) and today's list are public, no account needed |
+| **Try it in one click** | **https://app.kalita.tech/?demo=1** — a private demo account for 24 h: your own lists, export and API keys. The official list can't be changed from it. |
 | Public list snapshots | https://kalita.tech/registry/ (Merkle proofs, verifiable in the browser) |
 | Results | https://kalita.tech/results/ — every pre-registered hypothesis with its verdict, negative ones included |
 | On-chain registry | `KalitaRegistry` on Robinhood Chain mainnet: [`0xC7C5EF8e395e20e626670a9D2a5909e92bce31ca`](https://robinhoodchain.blockscout.com/address/0xC7C5EF8e395e20e626670a9D2a5909e92bce31ca?tab=contract) — no owner, no admin, no upgrades (`contracts/`) |
@@ -63,6 +64,36 @@ never used for selection):
   our first 5-day run had it below the market — that claim was a small-sample artefact and is withdrawn.
 
 Every hypothesis with its verdict, negative ones included: https://kalita.tech/results/ (`docs/RESULTS.md`).
+
+## Try it
+
+| What | How |
+|---|---|
+| Browse without an account | https://app.kalita.tech → Candidates: 17 range filters, presets *fast* / *soft*, sort by any column, click an address for the wallet card |
+| Your own lists and API keys | https://app.kalita.tech/?demo=1 — no sign-up; the demo account and everything in it is deleted after 24 h. Sign in with a wallet or an email link to keep your work |
+| Verify a snapshot | https://kalita.tech/registry/ → pick a day, paste an address — the Merkle proof is checked in your browser against the root committed on chain |
+
+### Public API (`/v1`, key from *My lists → API keys*, 60 requests/min)
+
+```bash
+K=kl_your_key
+curl -H "X-API-Key: $K" https://app.kalita.tech/v1/summary
+curl -H "X-API-Key: $K" https://app.kalita.tech/v1/list/fast            # today's official list
+curl -H "X-API-Key: $K" "https://app.kalita.tech/v1/candidates/fast?limit=100"
+curl -H "X-API-Key: $K" https://app.kalita.tech/v1/wallet/0xa60e892ab5fbf4754e3052b7643e48a1bd6b3065
+curl -H "X-API-Key: $K" https://app.kalita.tech/v1/snapshots            # daily snapshots with Merkle roots
+```
+
+### Verify a snapshot against the chain yourself
+
+```bash
+RPC=https://rpc.mainnet.chain.robinhood.com
+REG=0xC7C5EF8e395e20e626670a9D2a5909e92bce31ca
+cast call $REG "snapshotCount(uint256)(uint256)" 0 --rpc-url $RPC      # list 0 = fast, 1 = picker
+cast call $REG "verifyMember(uint256,uint256,address,bytes32[])(bool)" 0 0 <wallet> "[<proof...>]" --rpc-url $RPC
+```
+Members and proofs for every snapshot are published as JSON next to the registry page (`kalita.tech/registry/*.json`).
+Leaf = `keccak256(0x00 ‖ address)`, node = `keccak256(0x01 ‖ min ‖ max)`.
 
 ## Repository
 
