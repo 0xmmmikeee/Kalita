@@ -201,9 +201,20 @@ function sessionOf(req) {
   const m = /(?:^|;\s*)wl_sess=([^;]+)/.exec(req.headers.cookie || ''); if (!m) return null;
   const parts = decodeURIComponent(m[1]).split('.'); if (parts.length < 3) return null; const mac = parts.pop(), exp = parts.pop(), addr = parts.join('.'); if (!addr || !/^[0-9a-f]{64}$/.test(mac)) return null;
   const ok = crypto.timingSafeEqual(Buffer.from(mac, 'hex'), crypto.createHmac('sha256', SECRET).update(`${addr}.${exp}`).digest()); if (!ok || Date.now() > +exp) return null;
-  const u = users()[addr]; if (!u || u.blocked) return null; return { address: addr, role: u.role };
+  const u = users()[addr]; if (!u || u.blocked) return null; if (u.demo && Date.parse(u.expires) < Date.now()) return null; return u.demo ? { address: addr, role: 'user', demo: true, expires: u.expires } : { address: addr, role: u.role };
 }
 const LOGIN_HTML = fs.readFileSync(path.join(__dirname, 'login.html'), 'utf8');
+// ---------------- демо-аккаунты (WL_DEMO=1): изолированный пользователь на 24 ч, роль user; удаляется со списками и ключами
+const DEMO_PER_HOUR = parseInt(process.env.WL_DEMO_PER_HOUR || '50', 10); const demoHour = []; const demoIp = new Map();
+const clientIp = req => String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+function demoCleanup() {
+  try { const U = users(); const now = Date.now(); const dead = Object.keys(U).filter(id => U[id].demo && Date.parse(U[id].expires) < now); if (!dead.length) return 0;
+    for (const id of dead) delete U[id]; jwrite('users.json', U);
+    const L = jread('userlists.json', {}); let lc = false; for (const id of dead) if (L[id]) { delete L[id]; lc = true; } if (lc) jwrite('userlists.json', L);
+    const K = jread('apikeys.json', {}); let kc = false; for (const [h, v] of Object.entries(K)) if (dead.includes(v.user)) { delete K[h]; kc = true; } if (kc) jwrite('apikeys.json', K);
+    return dead.length; } catch (e) { return 0; }
+}
+setInterval(demoCleanup, 3600e3).unref();
 async function authRoutes(req, res, p) {
   if (p === '/auth/nonce') { const n = crypto.randomBytes(16).toString('hex'); nonces.set(n, Date.now() + 5 * 60e3); for (const [k, e] of nonces) if (e < Date.now()) nonces.delete(k);
     const msg = `kalita.tech wants you to sign in with your wallet.\n\nThis request will not trigger a blockchain transaction or cost any gas.\n\nNonce: ${n}\nIssued at: ${new Date().toISOString()}`; return send(res, 200, { nonce: n, message: msg }); }
@@ -213,6 +224,16 @@ async function authRoutes(req, res, p) {
     const U = users(); const first = Object.keys(U).length === 0; const u = U[rec] || { createdAt: new Date().toISOString(), role: (first || ADMINS.has(rec)) ? 'admin' : 'user' };
     if (ADMINS.has(rec)) u.role = 'admin'; u.lastLogin = new Date().toISOString(); u.logins = (u.logins || 0) + 1; U[rec] = u; jwrite('users.json', U); logEvent({ action: 'login', wallet: rec, by: u.role });
     res.writeHead(200, { 'content-type': 'application/json', 'set-cookie': `wl_sess=${encodeURIComponent(sessToken(rec))}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 86400}${req.headers['x-forwarded-proto'] === 'https' ? '; Secure' : ''}` }); return res.end(JSON.stringify({ address: rec, role: u.role }));
+  }
+  if (p === '/auth/demo' && req.method === 'POST') {
+    if (process.env.WL_DEMO !== '1') return send(res, 503, { error: 'demo is not enabled' });
+    const ip = clientIp(req); const now = Date.now();
+    demoHour.splice(0, demoHour.length, ...demoHour.filter(t => now - t < 3600e3)); if (demoHour.length >= DEMO_PER_HOUR) return send(res, 429, { error: 'demo is busy — try again later or sign in with a wallet' });
+    const di = (demoIp.get(ip) || []).filter(t => now - t < 86400e3); if (di.length >= 3) return send(res, 429, { error: 'demo limit for today — sign in with a wallet or email to continue' });
+    demoCleanup(); const id = 'demo:' + crypto.randomBytes(5).toString('hex'); const expires = new Date(now + 86400e3).toISOString();
+    const U = users(); U[id] = { createdAt: new Date(now).toISOString(), role: 'user', demo: true, expires, logins: 1 }; jwrite('users.json', U); demoHour.push(now); di.push(now); demoIp.set(ip, di); logEvent({ action: 'login', wallet: id, by: 'demo' });
+    const payload = `${id}.${now + 86400e3}`; const tok = payload + '.' + crypto.createHmac('sha256', SECRET).update(payload).digest('hex');
+    res.writeHead(200, { 'content-type': 'application/json', 'set-cookie': `wl_sess=${encodeURIComponent(tok)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400${req.headers['x-forwarded-proto'] === 'https' ? '; Secure' : ''}` }); return res.end(JSON.stringify({ address: id, demo: true, expires }));
   }
   if (p === '/auth/logout') { res.writeHead(302, { 'set-cookie': 'wl_sess=; Path=/; Max-Age=0', location: '/' }); return res.end(); }
   if (p === '/auth/me') return send(res, 200, sessionOf(req) || { address: null });
@@ -224,6 +245,8 @@ async function authRoutes(req, res, p) {
 const MAIL_ON = !!process.env.RESEND_API_KEY; const MAIL_FROM = process.env.MAIL_FROM || 'Kalita <sign-in@kalita.tech>';
 const mailTokens = new Map();  // token -> {email, exp}
 const mailRate = new Map();    // email -> [ts,...]
+const mailIp = new Map(); const MAIL_DAILY_MAX = parseInt(process.env.MAIL_DAILY_MAX || '80', 10); let mailDay = { d: '', n: 0 };
+const mailDayLeft = () => { const d = new Date().toISOString().slice(0, 10); if (mailDay.d !== d) mailDay = { d, n: 0 }; return MAIL_DAILY_MAX - mailDay.n; };
 const validEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e) && e.length <= 120;
 async function sendMail(to, link) {
   const html = `<div style="font-family:Manrope,Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;color:#17161A"><p style="font-size:22px;font-weight:800;margin:0 0 16px">kalita</p><p style="font-size:16px;line-height:1.5">Click the button to sign in. The link works once and expires in 15 minutes.</p><p style="margin:28px 0"><a href="${link}" style="background:#B5602B;color:#F4EFE6;text-decoration:none;padding:14px 22px;border-radius:12px;font-weight:600;display:inline-block">Sign in to Kalita</a></p><p style="font-size:13px;color:#6B6873">If you did not request this, ignore this email.<br>${link}</p></div>`;
@@ -235,11 +258,13 @@ async function mailRoutes(req, res, p) {
   if (p === '/auth/email/request' && req.method === 'POST') {
     if (!MAIL_ON) return send(res, 503, { error: 'email sign-in is not configured yet' });
     const b = await body(req); const email = String(b.email || '').trim().toLowerCase(); if (!validEmail(email)) return send(res, 400, { error: 'bad email' });
-    const now = Date.now(); const hist = (mailRate.get(email) || []).filter(t => now - t < 10 * 60e3); if (hist.length >= 3) return send(res, 429, { error: 'too many requests — try again in 10 minutes' });
+    const now = Date.now(); if (mailDayLeft() <= 0) return send(res, 503, { error: 'email sign-in is paused for today — use a wallet or try the demo' });
+    const ipk = clientIp(req); const ih = (mailIp.get(ipk) || []).filter(t => now - t < 3600e3); if (ih.length >= 5) return send(res, 429, { error: 'too many requests from this network — try again later' }); ih.push(now); mailIp.set(ipk, ih); if (mailIp.size > 5000) mailIp.clear();
+    const hist = (mailRate.get(email) || []).filter(t => now - t < 10 * 60e3); if (hist.length >= 3) return send(res, 429, { error: 'too many requests — try again in 10 minutes' });
     hist.push(now); mailRate.set(email, hist);
     const tok = crypto.randomBytes(24).toString('base64url'); mailTokens.set(tok, { email, exp: now + 15 * 60e3 }); for (const [k, v] of mailTokens) if (v.exp < now) mailTokens.delete(k);
     const host = req.headers['x-forwarded-host'] || req.headers.host; const proto = req.headers['x-forwarded-proto'] || 'http';
-    try { await sendMail(email, `${proto}://${host}/auth/email/verify?t=${tok}`); } catch (e) { mailTokens.delete(tok); return send(res, 502, { error: 'could not send the email' }); }
+    try { await sendMail(email, `${proto}://${host}/auth/email/verify?t=${tok}`); mailDay.n++; } catch (e) { mailTokens.delete(tok); return send(res, 502, { error: 'could not send the email' }); }
     return send(res, 200, { ok: true });
   }
   if (p === '/auth/email/verify') {
@@ -249,7 +274,7 @@ async function mailRoutes(req, res, p) {
     u.lastLogin = new Date().toISOString(); u.logins = (u.logins || 0) + 1; U[id] = u; jwrite('users.json', U); logEvent({ action: 'login', wallet: id, by: u.role });
     res.writeHead(302, { location: '/', 'set-cookie': `wl_sess=${encodeURIComponent(sessToken(id))}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 86400}${req.headers['x-forwarded-proto'] === 'https' ? '; Secure' : ''}` }); return res.end();
   }
-  if (p === '/auth/config') return send(res, 200, { email: MAIL_ON, google: GOOGLE_ON });
+  if (p === '/auth/config') return send(res, 200, { email: MAIL_ON && mailDayLeft() > 0, google: GOOGLE_ON, demo: process.env.WL_DEMO === '1' });
   return false;
 }
 
@@ -302,7 +327,7 @@ async function myRoutes(req, res, p, sess) {
   const all = ulists(); const mine = all[sess.address] || (all[sess.address] = {});
   const now = new Date().toISOString();
   if (p === '/api/my/lists' && req.method === 'GET') return send(res, 200, Object.entries(mine).map(([id, l]) => ({ id, name: l.name, notes: l.notes || '', size: Object.keys(l.wallets).length, created: l.created, updated: l.updated })));
-  if (p === '/api/my/lists' && req.method === 'POST') { const b = await body(req); if (Object.keys(mine).length >= 50) return send(res, 400, { error: 'too many lists' }); const id = crypto.randomBytes(6).toString('hex'); mine[id] = { name: String(b.name || 'My list').slice(0, 60), notes: String(b.notes || '').slice(0, 2000), wallets: {}, created: now, updated: now, log: [{ at: now, a: 'create' }] }; ulSave(all); return send(res, 200, { id }); }
+  if (p === '/api/my/lists' && req.method === 'POST') { const b = await body(req); if (Object.keys(mine).length >= (sess.demo ? 5 : 50)) return send(res, 400, { error: sess.demo ? 'demo: up to 5 lists' : 'too many lists' }); const id = crypto.randomBytes(6).toString('hex'); mine[id] = { name: String(b.name || 'My list').slice(0, 60), notes: String(b.notes || '').slice(0, 2000), wallets: {}, created: now, updated: now, log: [{ at: now, a: 'create' }] }; ulSave(all); return send(res, 200, { id }); }
   const m = /^\/api\/my\/lists\/([0-9a-f]{12})(\/(wallets|export|log))?$/.exec(p) || /^\/export\/my\/([0-9a-f]{12})\.txt$/.exec(p);
   if (!m) return send(res, 404, { error: 'no' });
   const id = m[1]; const l = mine[id]; if (!l) return send(res, 404, { error: 'no such list' });
@@ -321,12 +346,12 @@ const akeys = () => jread('apikeys.json', {}); const akSave = o => jwrite('apike
 const khash = k => crypto.createHash('sha256').update(k).digest('hex');
 const rl = new Map();  // rate limit: id -> [windowStart, count]
 function limited(id, max = 60) { const now = Date.now(); const w = rl.get(id); if (!w || now - w[0] > 60e3) { rl.set(id, [now, 1]); return false; } if (++w[1] > max) return true; return false; }
-function keyUser(req, q) { const k = req.headers['x-api-key'] || q.key; if (!k) return null; const K = akeys(); const rec = K[khash(String(k))]; if (!rec || rec.revoked) return null; rec.lastUsed = new Date().toISOString(); rec.calls = (rec.calls || 0) + 1; if (rec.calls % 20 === 1) akSave(K); return rec; }
+function keyUser(req, q) { const k = req.headers['x-api-key'] || q.key; if (!k) return null; const K = akeys(); const rec = K[khash(String(k))]; if (!rec || rec.revoked) return null; if (String(rec.user).startsWith('demo:')) { const du = users()[rec.user]; if (!du || Date.parse(du.expires) < Date.now()) return null; } rec.lastUsed = new Date().toISOString(); rec.calls = (rec.calls || 0) + 1; if (rec.calls % 20 === 1) akSave(K); return rec; }
 async function keyRoutes(req, res, p, sess) {
   if (p === '/api/my/keys') {
     if (!sess) return send(res, 401, { error: 'sign in required' }); const K = akeys();
     if (req.method === 'GET') return send(res, 200, Object.entries(K).filter(([, v]) => v.user === sess.address && !v.revoked).map(([h, v]) => ({ id: h.slice(0, 8), name: v.name, created: v.created, lastUsed: v.lastUsed, calls: v.calls || 0, prefix: v.prefix })));
-    if (req.method === 'POST') { const b = await body(req); if (Object.values(K).filter(v => v.user === sess.address && !v.revoked).length >= 5) return send(res, 400, { error: 'max 5 keys' }); const key = 'kl_' + crypto.randomBytes(24).toString('base64url'); K[khash(key)] = { user: sess.address, name: String(b.name || 'key').slice(0, 40), created: new Date().toISOString(), prefix: key.slice(0, 7) }; akSave(K); return send(res, 200, { key }); }
+    if (req.method === 'POST') { const b = await body(req); if (Object.values(K).filter(v => v.user === sess.address && !v.revoked).length >= (sess.demo ? 2 : 5)) return send(res, 400, { error: sess.demo ? 'demo: up to 2 keys' : 'max 5 keys' }); const key = 'kl_' + crypto.randomBytes(24).toString('base64url'); K[khash(key)] = { user: sess.address, name: String(b.name || 'key').slice(0, 40), created: new Date().toISOString(), prefix: key.slice(0, 7) }; akSave(K); return send(res, 200, { key }); }
     if (req.method === 'DELETE') { const b = await body(req); for (const [h, v] of Object.entries(K)) if (v.user === sess.address && h.startsWith(String(b.id || '').slice(0, 8)) && b.id) v.revoked = true; akSave(K); return send(res, 200, { ok: true }); }
   }
   if (!p.startsWith('/v1/')) return false;
@@ -341,6 +366,7 @@ async function keyRoutes(req, res, p, sess) {
   return send(res, 404, { error: 'unknown endpoint', endpoints: ['/v1/summary', '/v1/list/{fast|picker|all}', '/v1/candidates/{fast|picker}?limit=100', '/v1/wallet/{address}', '/v1/snapshots'] });
 }
 
+const guestHits = new Map();
 http.createServer(async (req, res) => {
   res._gz = /\bgzip\b/.test(req.headers['accept-encoding'] || '');
   const u = url.parse(req.url, true); const p = u.pathname; const q = u.query;
@@ -354,7 +380,18 @@ http.createServer(async (req, res) => {
     { const r = await keyRoutes(req, res, p, sess); if (r !== false) return; }
     { const r = await myRoutes(req, res, p, sess); if (r !== false) return; }
     if (AUTH_ON && !sess && process.env.WL_DEMO_PUBLIC === '1' && (p === '/api/summary' || (p === '/api/candidates' && (q.limit === '10' || q.demo === '1')))) { if (p === '/api/candidates') { const pr = PROFILES.includes(q.profile) ? q.profile : 'fast'; const rows = [...scores[pr].values()].filter(r => eligible(pr, r)).sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 10).map(r => Object.assign({}, r, { wallet: r.wallet.slice(0, 6) + '…' + r.wallet.slice(-4) })); return send(res, 200, rows); } }
-    const demoOK = process.env.WL_DEMO_PUBLIC === '1' && (p === '/' || p === '/api/summary');
+    // гостевой просмотр (WL_GUEST_READ=1): только чтение — кандидаты (≤500), текущий список, карточка кошелька. Лимит 60 запросов/мин на IP.
+    const GUEST_READ = process.env.WL_GUEST_READ === '1';
+    const guestPath = req.method === 'GET' && (p === '/' || p === '/api/summary' || p === '/api/candidates' || p === '/api/active' || p.startsWith('/api/wallet/'));
+    if (AUTH_ON && !sess && GUEST_READ && guestPath) {
+      const ip = clientIp(req); const now = Date.now();
+      const g = guestHits.get(ip) || { t: now, n: 0 }; if (now - g.t > 60e3) { g.t = now; g.n = 0; } g.n++; guestHits.set(ip, g); if (guestHits.size > 5000) guestHits.clear();
+      if (g.n > 60) return send(res, 429, { error: 'too many requests' });
+      if (p.startsWith('/api/wallet/')) { const wk = 'gw:' + ip; if (limited(wk, 10)) return send(res, 429, { error: 'too many requests' }); }
+      if (p === '/api/candidates') q.limit = String(Math.min(5000, Math.max(1, +(q.limit || 500) || 500)));
+    }
+    if (sess && sess.demo && limited('d:' + sess.address, 120)) return send(res, 429, { error: 'too many requests' });
+    const demoOK = (process.env.WL_DEMO_PUBLIC === '1' && (p === '/' || p === '/api/summary')) || (GUEST_READ && guestPath);
     if (AUTH_ON && !sess && !demoOK) { if (p === '/' ) return send(res, 200, LOGIN_HTML, 'text/html'); return send(res, 401, { error: 'sign in required' }); }
     if (AUTH_ON && req.method === 'POST' && sess.role !== 'admin') return send(res, 403, { error: 'admin only' });
     if (p.startsWith('/export/') && AUTH_ON && !sess) return send(res, 401, { error: 'sign in required' });
@@ -366,13 +403,13 @@ http.createServer(async (req, res) => {
     }
     if (p === '/api/candidates') {
       const key = [q.profile || 'fast', q.limit || 500, q.sort || 'score', q.desc !== '0', q.q || ''].join('|'); const ver = loadedAt + ':' + stateVer;
-      let c = candCache.get(key); if (!c || c.ver !== ver) { const json = JSON.stringify(candidates(q.profile || 'fast', { limit: +(q.limit || 500), sort: q.sort || 'score', desc: q.desc !== '0', q: q.q || '' })); c = { ver, json, gz: json.length > 2048 ? zlib.gzipSync(json) : null }; if (candCache.size > 32) candCache.clear(); candCache.set(key, c); }
+      let c = candCache.get(key); if (!c || c.ver !== ver) { const json = JSON.stringify(candidates(q.profile || 'fast', { limit: +(q.limit || 500), sort: q.sort || 'score', desc: q.desc !== '0', q: q.q || '' })); c = { ver, json, gz: json.length > 2048 ? zlib.gzipSync(json) : null }; if (candCache.size > 96) candCache.clear(); candCache.set(key, c); }
       const h = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }; if (res._gz && c.gz) { h['content-encoding'] = 'gzip'; res.writeHead(200, h); return res.end(c.gz); } res.writeHead(200, h); return res.end(c.json);
     }
     if (p.startsWith('/api/wallet/')) return send(res, 200, walletView(p.split('/').pop()));
     if (p === '/api/active') return send(res, 200, Object.entries(active).map(([w, a]) => Object.assign({ wallet: w }, a, { metrics: scores[a.profile] && scores[a.profile].get(w) || null })));
     if (p === '/api/rejected') return send(res, 200, Object.entries(rejected).map(([w, a]) => Object.assign({ wallet: w }, a)));
-    if (p === '/api/log') return send(res, 200, readLog(+(q.limit || 500)));
+    if (p === '/api/log') { const L = readLog(+(q.limit || 500)); return send(res, 200, (sess && sess.role === 'admin') ? L : (Array.isArray(L) ? L.filter(e => e && e.action !== 'login') : L)); }
     if (p === '/api/lists') { try { return send(res, 200, JSON.parse(fs.readFileSync(path.join(DATA, 'scores', 'lists.json'), 'utf8'))); } catch { return send(res, 200, {}); } }
     if (p === '/api/rules' && req.method === 'POST') { const b = await body(req); for (const pr of PROFILES) if (b[pr]) rules[pr] = Object.assign({}, rules[pr], b[pr]); jwrite('rules.json', rules); logEvent({ action: 'rules', by: 'ui', rules }); return send(res, 200, rules); }
     if (p === '/api/apply' && req.method === 'POST') { const b = await body(req); return send(res, 200, applyRules(b.profile || 'fast', b.by || 'ui')); }
