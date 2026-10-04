@@ -1,0 +1,145 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face{font-family:Manrope;src:url(Manrope.ttf);font-weight:200 800}
+html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#17161A;color:#F4EFE6;font-family:Manrope,system-ui,sans-serif}
+.scene{position:absolute;inset:0;opacity:0;transform:scale(1.02);transition:opacity .7s ease,transform .9s ease;pointer-events:none}
+.scene.on{opacity:1;transform:none}
+.center{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:0 180px;box-sizing:border-box}
+h1{font-size:100px;font-weight:800;letter-spacing:-.04em;margin:0}
+h2{font-size:62px;font-weight:800;letter-spacing:-.03em;margin:0 0 26px;line-height:1.12}
+p{font-size:34px;line-height:1.45;color:#CFCAD8;margin:0;max-width:1440px}
+.acc{color:#B5602B}
+.b{opacity:0;transform:translateY(18px);transition:opacity .55s ease,transform .55s ease}
+.b.on{opacity:1;transform:none}
+.dim{transition:opacity .5s}.dim.off{opacity:.35}
+.cap{position:absolute;left:0;right:0;bottom:0;padding:44px 90px 40px;background:linear-gradient(transparent,rgba(23,22,26,.97) 45%);font-size:33px;line-height:1.35;font-weight:600}
+.cap span{color:#B5602B}
+.frame{position:absolute;left:120px;top:80px;width:1680px;height:880px;border-radius:18px;overflow:hidden;background:#0f0f12;box-shadow:0 40px 120px rgba(0,0,0,.6);border:1px solid rgba(244,239,230,.08)}
+.frame img{position:absolute;left:0;top:0;width:1680px;transition:transform 8s linear,opacity .7s ease}
+.frame img.hide{opacity:0}
+iframe{border:0;width:1440px;height:9000px;transform:scale(1.1667);transform-origin:0 0;transition:transform 9s linear}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:36px;width:1580px;margin-top:40px}
+.card{background:#232229;border:1px solid rgba(244,239,230,.1);border-radius:20px;padding:36px;text-align:left}
+.card b{display:block;font-size:34px;margin-bottom:12px}.card b i{font-style:normal;color:#B5602B;margin-right:10px}
+.card span{font-size:25px;color:#CFCAD8;line-height:1.4}
+.big{font-size:150px;font-weight:800;letter-spacing:-.05em;line-height:1;font-variant-numeric:tabular-nums}
+.row{display:flex;gap:140px;margin-top:24px}.row div{text-align:center}
+.row small{display:block;font-size:30px;color:#CFCAD8;margin-top:10px}
+.chain{display:flex;align-items:center;gap:26px;margin-top:44px}
+.blk{background:#232229;border:2px solid #B5602B;border-radius:16px;padding:24px 32px;font-size:28px;font-weight:700}
+.arrow{font-size:44px;color:#B5602B}
+.logo{display:flex;align-items:center;gap:34px;margin-bottom:36px}
+.mono{font-family:ui-monospace,Menlo,monospace;font-size:26px;color:#A9A5B2}
+#bar{position:absolute;left:0;top:0;height:6px;background:#B5602B;width:0;z-index:9;transition:width .3s linear}
+#lbl{position:absolute;right:60px;top:34px;font-size:22px;font-weight:600;color:#A9A5B2;letter-spacing:.06em;text-transform:uppercase;z-index:9;transition:opacity .5s}
+.bars{display:flex;gap:90px;align-items:flex-end;height:420px;margin-top:40px}
+.bar{width:220px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+.bar .f{width:100%;border-radius:14px 14px 4px 4px;background:#3a3842;height:0;transition:height 1.4s cubic-bezier(.2,.8,.2,1)}
+.bar .f.acc{background:#B5602B}.bar .f.red{background:#c9503f}
+.bar .v{font-size:56px;font-weight:800;margin-bottom:12px;font-variant-numeric:tabular-nums}
+.bar .k{font-size:24px;color:#CFCAD8;margin-top:16px;line-height:1.3;height:70px}
+.reg{position:absolute;right:110px;top:110px;width:860px;height:820px;border-radius:16px;overflow:hidden;box-shadow:0 30px 90px rgba(0,0,0,.6);border:1px solid rgba(244,239,230,.1);opacity:0;transform:translateY(40px);transition:all .8s ease;background:#fff}
+.reg.on{opacity:1;transform:none}
+.reg iframe{width:1200px;height:1120px;transform:scale(.7167);transform-origin:0 0;transition:none}
+.regcap{position:absolute;left:0;right:0;bottom:0;padding:16px 22px;background:rgba(23,22,26,.92);color:#F4EFE6;font-size:22px;font-weight:600}
+.vchain{display:flex;flex-direction:column;align-items:flex-start;gap:8px;margin-top:30px}.varrow{font-size:30px;color:#B5602B;margin-left:40px}
+</style></head><body>
+<div id="bar"></div><div id="lbl"></div>
+
+<div class="scene center" id="s1">
+  <div class="logo b"><img src="mark.svg" width="150" height="150"><h1>kalita</h1></div>
+  <p class="b" style="font-size:44px;color:#F4EFE6">Follow the wallets that <span class="acc">actually</span> beat the market.</p>
+  <p class="b" style="margin-top:26px">Robinhood Chain · Pons launchpad · Arbitrum Open House Singapore 2026</p>
+</div>
+
+<div class="scene center" id="s2">
+  <h2 class="b">Copy-trading is a “who to follow” problem.<br>The market answers it dishonestly.</h2>
+  <p class="b">“Smart wallet” lists are built by hindsight, refreshed by hand, never audited.<br>We measured a popular 1 132-wallet list on Robinhood Chain over 30 days:</p>
+  <div class="row"><div class="b"><div class="big"><span class="cnt" data-to="23.7" data-d="1">0.0</span>%</div><small>its signals hit ×2 in 1 h</small></div><div class="b"><div class="big" style="color:#A9A5B2"><span class="cnt" data-to="21.4" data-d="1">0.0</span>%</div><small>expected for random buyers<br>at the same curve positions</small></div><div class="b"><div class="big acc">×<span class="cnt" data-to="1.11" data-d="2">0.00</span></div><small>lift — a number none of its<br>subscribers has ever seen</small></div></div>
+</div>
+
+<div class="scene" id="s3">
+  <div class="frame"><iframe id="site" src="site.html"></iframe></div>
+  <div class="cap b">Kalita scores <span>every</span> early buyer on the bonding curve — 8 M signals · 862 k wallets · 451 k tokens — and keeps a live, self-correcting list.</div>
+</div>
+
+<div class="scene center" id="s4">
+  <h2 class="b">Compare like with like</h2>
+  <div class="cards">
+    <div class="card b"><b><i>1</i>Passports</b><span>For each wallet's first buy we simulate a follower entering 2 s later and record its path: peaks at 1 m … 30 d, rug in 10 min, drawdown before ×2, graduation.</span></div>
+    <div class="card b"><b><i>2</i>Position baseline</b><span>A 5th buyer is measured against 5th buyers. Market rate per bucket of “how full was the curve” — early ≠ skilled.</span></div>
+    <div class="card b"><b><i>3</i>Pessimistic &amp; out of sample</b><span>Beta shrinkage, Wilson lower bound, edge = bound − expected. Selection period ≠ validation (last 7 days); placebo list alongside.</span></div>
+  </div>
+</div>
+
+<div class="scene" id="s5">
+  <div class="frame"><img id="p1" src="shots/tab-candidates.png"><img id="p2" class="hide" src="shots/wallet-card.png"><img id="p4" class="hide" src="shots/lang-ja.png"><img id="p3" class="hide" src="shots/tab-log.png"></div>
+  <div class="cap"><span id="c5a" class="b" style="color:#F4EFE6">Candidates with edge over the market · filter presets · change log · rejected wallets · 12 languages.</span><br><span id="c5b" class="b" style="color:#F4EFE6">Wallet or email sign-in · personal lists · change log with reasons · export to the engine · API keys.</span></div>
+</div>
+
+<div class="scene center" id="s6">
+  <h2 class="b">Validation catches luck</h2>
+  <div class="bars b">
+    <div class="bar"><div class="v"><span class="cnt" data-to="38.6" data-d="1">0</span>%</div><div class="f red" data-h="386"></div><div class="k">in sample<br>791 signals</div></div>
+    <div class="bar"><div class="v"><span class="cnt" data-to="15.0" data-d="1">0</span>%</div><div class="f" data-h="150"></div><div class="k">same wallet,<br>validation week</div></div>
+    <div class="bar"><div class="v"><span class="cnt" data-to="26.5" data-d="1">0</span>%</div><div class="f" data-h="265"></div><div class="k">market rate<br>at its positions</div></div>
+  </div>
+  <p class="b" style="margin-top:40px;font-size:38px;color:#F4EFE6;font-weight:700">Not on the list. <span class="acc">That is the system working.</span></p>
+</div>
+
+<div class="scene" id="s7">
+  <div style="position:absolute;left:120px;top:110px;width:760px">
+    <h2 class="b" style="font-size:58px">Sealed on chain,<br>every day</h2>
+    <p class="b" style="font-size:29px"><b>KalitaRegistry</b> — no contract owner, no admin key, no upgrades, no funds. Each daily list is committed as a Merkle root with its size and the wallets added / removed, strictly ordered in time.</p>
+    <div class="vchain">
+      <div class="blk b">list as of day N</div><div class="varrow b">↓</div>
+      <div class="blk b">Merkle root · size · +added −removed</div><div class="varrow b">↓</div>
+      <div class="blk b">publishSnapshot() → verifyMember(wallet, proof)</div>
+    </div>
+    <p class="mono b" style="margin-top:34px;font-size:22px">15 Foundry tests incl. fuzzing · Solidity and the Python tool share one Merkle test vector</p>
+  </div>
+  <div class="reg" id="reg"><iframe src="registry/index.html"></iframe><div class="regcap">kalita.tech/registry/ — verify any wallet in the browser</div></div>
+</div>
+
+<div class="scene center" id="s8">
+  <h2 class="b">30 days, out of sample</h2>
+  <div class="row"><div class="b"><div class="big acc"><span class="cnt" data-to="21.8" data-d="1">0.0</span>%</div><small>top-100 list · ×2 in 1 h<br>3 396 validation signals</small></div><div class="b"><div class="big" style="color:#A9A5B2"><span class="cnt" data-to="14.8" data-d="1">0.0</span>%</div><small>market at the same positions<br>placebo lists ≈ market</small></div><div class="b"><div class="big">ρ <span class="cnt" data-to="0.35" data-d="2">0.00</span></div><small>week-to-week persistence<br>of a wallet's edge</small></div></div>
+  <p class="b" style="margin-top:44px">Five pre-registered hypotheses · verdicts at kalita.tech/results/ — negative ones included.</p>
+</div>
+
+<div class="scene center" id="s9">
+  <div class="logo b"><img src="mark.svg" width="120" height="120"><h1 style="font-size:84px">kalita</h1></div>
+  <p class="b" style="font-size:40px;color:#F4EFE6">kalita.tech · app.kalita.tech · github.com/0xmmmikeee/Kalita</p>
+  <p class="b" style="margin-top:22px">Who to follow — <span class="acc">with a record that cannot be rewritten</span>.</p>
+</div>
+
+<script>
+const TL=__TIMELINE__, TOTAL=__TOTAL__;
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+function count(el){const to=+el.dataset.to,d=+el.dataset.d,t0=performance.now(),D=1300;(function f(){const p=Math.min(1,(performance.now()-t0)/D),e=1-Math.pow(1-p,3);el.textContent=(to*e).toFixed(d);if(p<1)requestAnimationFrame(f)})()}
+function show(el){if(!el)return;el.classList.add('on');$$('.cnt',el).forEach(count);if(el.classList.contains('cnt'))count(el);el.querySelectorAll('.f[data-h]').forEach(f=>setTimeout(()=>f.style.height=f.dataset.h+'px',80));}
+// биты каждой сцены: список действий по индексу предложения
+const ACT={
+ s1:[()=>{show($('#s1 .logo'))},()=>{show($$('#s1 .b')[1]);setTimeout(()=>show($$('#s1 .b')[2]),900)}],
+ s2:[()=>show($$('#s2 .b')[0]),()=>show($$('#s2 .b')[1]),()=>{setTimeout(()=>show($$('#s2 .row .b')[0]),2400);setTimeout(()=>show($$('#s2 .row .b')[1]),5600)},()=>show($$('#s2 .row .b')[2])],
+ s3:[()=>{show($('#s3 .cap'));setTimeout(()=>{$('#site').style.transform='scale(1.1667) translateY(-1500px)'},900)}],
+ s4:[()=>show($('#s4 h2')),()=>show($$('#s4 .card')[0]),()=>show($$('#s4 .card')[1]),()=>show($$('#s4 .card')[2])],
+ s5:[()=>{show($('#c5a'));setTimeout(()=>{$('#p1').style.transform='translateY(-90px) scale(1.06)'},300);setTimeout(()=>{$('#p1').classList.add('hide');$('#p2').classList.remove('hide');$('#p2').style.transform='translateY(-120px) scale(1.08)'},3800);setTimeout(()=>{$('#p2').classList.add('hide');$('#p4').classList.remove('hide');$('#p4').style.transform='translateY(-40px) scale(1.04)'},7000)},
+     ()=>{show($('#c5b'));$('#p4').classList.add('hide');$('#p3').classList.remove('hide');setTimeout(()=>{$('#p3').style.transform='translateY(-60px) scale(1.06)'},200)}],
+ s6:[()=>show($('#s6 h2')),()=>show($('#s6 .bars')),()=>show($$('#s6 p')[0])],
+ s7:[()=>{show($('#s7 h2'));show($$('#s7 p')[0])},()=>{$$('#s7 .vchain .b').forEach((c,i)=>setTimeout(()=>show(c),i*400))},()=>{$('#reg').classList.add('on')},()=>show($('#s7 .mono'))],
+ s8:[()=>{show($('#s8 h2'));show($$('#s8 .row .b')[0]);setTimeout(()=>show($$('#s8 .row .b')[1]),2600)},()=>show($$('#s8 .row .b')[2]),()=>show($$('#s8 p')[0])],
+ s9:[()=>{show($('#s9 .logo'));show($$('#s9 p')[0])},()=>show($$('#s9 p')[1]),()=>{}]
+};
+for(const sc of TL){
+  setTimeout(()=>{$$('.scene.on').forEach(e=>e.classList.remove('on'));document.getElementById(sc.id).classList.add('on');$('#lbl').textContent=sc.label;$('#lbl').style.opacity=sc.label?1:0;},sc.start);
+  const acts=ACT[sc.id]||[];
+  sc.beats.forEach((b,i)=>{const a=acts[Math.min(i,acts.length-1)];if(i<acts.length)setTimeout(a,b)});
+  // если предложений больше, чем действий — лишние биты игнорируются; если меньше — оставшиеся действия по остатку времени
+  if(sc.beats.length<acts.length){const last=sc.beats[sc.beats.length-1],end=sc.start+sc.len-900,n=acts.length-sc.beats.length;for(let j=0;j<n;j++)setTimeout(acts[sc.beats.length+j],last+(end-last)*(j+1)/(n+1));}
+}
+const t0=performance.now();(function bar(){const p=Math.min(1,(performance.now()-t0)/TOTAL);$('#bar').style.width=(p*1920)+'px';if(p<1)requestAnimationFrame(bar)})();
+window.TOTAL=TOTAL;
+</script>
+</body></html>

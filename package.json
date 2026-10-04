@@ -1,0 +1,1 @@
+{ "name": "wallet-lab", "version": "0.8.5", "private": true, "scripts": { "start": "node src/server.js", "passports": "python3 src/build_passports.py ../scout-bot/data/launchpad-cache.json data/signals.csv", "score": "python3 src/score_wallets.py data/signals.csv data/scores" }, "engines": { "node": ">=18" } }

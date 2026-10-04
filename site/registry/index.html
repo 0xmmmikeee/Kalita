@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kalita — list registry</title><link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F4EFE6;--card:#FFFDF9;--ink:#17161A;--mut:#6B6873;--line:#DED9D0;--acc:#B5602B;--ok:#3F7D4F;--bad:#B23B3B}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Manrope,system-ui,sans-serif}
+.wrap{max-width:1040px;margin:0 auto;padding:40px 24px 80px}
+nav{display:flex;align-items:center;gap:12px;margin-bottom:36px}nav b{font-size:22px;font-weight:800;letter-spacing:-.04em}nav a{color:var(--mut);text-decoration:none;margin-left:auto}
+h1{font-size:40px;font-weight:800;letter-spacing:-.03em;line-height:1.05;margin:0 0 12px}h2{font-size:20px;margin:36px 0 12px}p.lead{font-size:18px;color:#4A4750;max-width:760px;margin:0 0 28px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}.stat .k{font-size:12px;color:var(--mut)}.stat .v{font-size:26px;font-weight:800;letter-spacing:-.02em}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}th{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.05em}td.r,th.r{text-align:right}
+.mono{font-family:ui-monospace,Menlo,monospace;font-size:12.5px}.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;background:#EFE9DD;color:var(--mut)}.pill.on{background:#E3EFE5;color:var(--ok)}
+input,select,button{font:600 14px Manrope,sans-serif;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--card);color:var(--ink)}button{background:var(--acc);border-color:var(--acc);color:#F4EFE6;cursor:pointer}
+.res{margin-top:12px;font-weight:700}.ok{color:var(--ok)}.bad{color:var(--bad)}
+.sched{display:flex;flex-wrap:wrap;gap:6px}.day{width:34px;height:34px;border-radius:8px;background:#EFE9DD;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--mut)}.day.on{background:var(--acc);color:#F4EFE6;font-weight:700}
+.small{font-size:13px;color:var(--mut)}
+</style></head><body><div class="wrap">
+<nav><svg width="30" height="30" viewBox="0 0 64 64"><circle cx="32" cy="32" r="25" fill="none" stroke="#17161A" stroke-width="6"/><path d="M32 9 40 32 32 34.5 24 32Z" fill="#B5602B"/><path d="M32 55 24 32 32 34.5 40 32Z" fill="#17161A"/><circle cx="32" cy="32" r="3.5" fill="#F4EFE6"/></svg><b>kalita</b><a href="/">← kalita.tech</a></nav>
+<h1>List registry</h1>
+<p class="lead">Every daily snapshot of a Kalita list is published here as a Merkle root of its members with the size and the wallets added and removed. The same root is committed to <b>KalitaRegistry</b> on Robinhood Chain, so a list can never be rewritten in hindsight. Anyone can verify that a wallet was on the list on a given day — below, in your browser.</p>
+<div class="card"><div class="row" id="stats"></div></div>
+<h2>Snapshots</h2>
+<div class="card"><div style="display:flex;gap:12px;align-items:center;margin-bottom:14px"><select id="profile"><option value="fast">Fast · ×2 in 1 h</option><option value="picker">Pickers · pool or ×5 in 24 h</option></select><span class="small" id="chain">on-chain: pending deployment</span></div><div class="sched" id="sched"></div><div style="overflow:auto;margin-top:14px"><table id="tbl"><thead><tr><th>As of (UTC)</th><th class="r">Size</th><th class="r">Added</th><th class="r">Removed</th><th>Merkle root</th><th>On chain</th><th></th></tr></thead><tbody></tbody></table></div></div>
+<h2>Verify a wallet</h2>
+<div class="card"><p class="small" style="margin:0 0 12px">Pick a snapshot, paste an address. The proof is fetched from the snapshot file and checked against the root here, in your browser — nothing is sent to us.</p>
+<div style="display:flex;gap:8px;flex-wrap:wrap"><select id="snap" style="min-width:220px"></select><input id="addr" placeholder="0x…" style="flex:1;min-width:280px" class="mono"><button id="go">Verify</button></div><div class="res" id="res"></div></div>
+<h2>How the root is built</h2>
+<div class="card small">leaf = keccak256(0x00 ‖ address) · node = keccak256(0x01 ‖ min(a,b) ‖ max(a,b)) · odd leaf carried up unchanged. The same function is used by <span class="mono">contracts/KalitaRegistry.sol</span> (<span class="mono">verifyMember</span>) and by <span class="mono">src/registry_snapshot.py</span>; the shared test vector is in the repository.</div>
+</div>
+<script>
+
+const RC=[1n,0x8082n,0x800000000000808an,0x8000000080008000n,0x808bn,0x80000001n,0x8000000080008081n,0x8000000000008009n,0x8an,0x88n,0x80008009n,0x8000000an,0x8000808bn,0x800000000000008bn,0x8000000000008089n,0x8000000000008003n,0x8000000000008002n,0x8000000000000080n,0x800an,0x800000008000000an,0x8000000080008081n,0x8000000000008080n,0x80000001n,0x8000000080008008n];
+const ROT=[[0,36,3,41,18],[1,44,10,45,2],[62,6,43,15,61],[28,55,25,21,56],[27,20,39,8,14]];const M64=(1n<<64n)-1n;const rol=(x,n)=>n%64===0?x:(((x<<BigInt(n%64))|(x>>BigInt(64-n%64)))&M64);
+function keccakF(A){for(let r=0;r<24;r++){const C=[0,1,2,3,4].map(x=>A[x][0]^A[x][1]^A[x][2]^A[x][3]^A[x][4]);const D=[0,1,2,3,4].map(x=>C[(x+4)%5]^rol(C[(x+1)%5],1));for(let x=0;x<5;x++)for(let y=0;y<5;y++)A[x][y]^=D[x];const B=[[],[],[],[],[]];for(let x=0;x<5;x++)for(let y=0;y<5;y++)B[y][(2*x+3*y)%5]=rol(A[x][y],ROT[x][y]);for(let x=0;x<5;x++)for(let y=0;y<5;y++)A[x][y]=B[x][y]^((~B[(x+1)%5][y])&B[(x+2)%5][y]&M64);A[0][0]^=RC[r]}}
+function keccak256(bytes){const rate=136;const A=[...Array(5)].map(()=>[0n,0n,0n,0n,0n]);const msg=new Uint8Array(bytes.length+1);msg.set(bytes);msg[bytes.length]=1;const padLen=(rate-msg.length%rate)%rate;const full=new Uint8Array(msg.length+padLen);full.set(msg);full[full.length-1]|=0x80;const dv=new DataView(full.buffer);for(let off=0;off<full.length;off+=rate){for(let i=0;i<rate/8;i++)A[i%5][Math.floor(i/5)]^=dv.getBigUint64(off+8*i,true);keccakF(A)}const out=new Uint8Array(32);const od=new DataView(out.buffer);for(let i=0;i<4;i++)od.setBigUint64(8*i,A[i%5][Math.floor(i/5)],true);return out}
+const hex=b=>'0x'+[...b].map(x=>x.toString(16).padStart(2,'0')).join('');const unhex=h=>Uint8Array.from(h.replace(/^0x/,'').match(/../g).map(x=>parseInt(x,16)));
+const leaf=a=>keccak256(new Uint8Array([0,...unhex(a)]));const node=(a,b)=>{const [x,y]=hex(a)<hex(b)?[a,b]:[b,a];return keccak256(new Uint8Array([1,...x,...y]))};
+function verify(root,addr,proof){let h=leaf(addr.toLowerCase());for(const p of proof)h=node(h,unhex(p));return hex(h)===root.toLowerCase()}
+
+const $=s=>document.querySelector(s);let snaps=[];
+async function load(){let idx=[];try{idx=await (await fetch('/registry/index.json',{cache:'no-store'})).json()}catch{}
+snaps=idx.sort((a,b)=>b.asOf-a.asOf);render()}
+function render(){const pr=$('#profile').value;const rows=snaps.filter(s=>s.profile===pr);const latest=rows[0];
+$('#stats').innerHTML=[['Snapshots',rows.length],['Latest size',latest?latest.size:'—'],['Last churn',latest?`+${latest.added} −${latest.removed}`:'—'],['Latest as of',latest?new Date(latest.asOf*1000).toISOString().slice(0,16).replace('T',' '):'—']].map(([k,v])=>`<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+const days=[...Array(30)].map((_,i)=>{const d=new Date(Date.now()-(29-i)*86400e3);return d.toISOString().slice(0,10)});const have=new Set(rows.map(s=>new Date(s.asOf*1000).toISOString().slice(0,10)));$('#sched').innerHTML=days.map(d=>`<div class="day ${have.has(d)?'on':''}" title="${d}">${+d.slice(8)}</div>`).join('');
+$('#tbl tbody').innerHTML=rows.length?rows.map(s=>`<tr><td>${new Date(s.asOf*1000).toISOString().slice(0,16).replace('T',' ')}</td><td class="r">${s.size}</td><td class="r">+${s.added}</td><td class="r">−${s.removed}</td><td class="mono">${s.root.slice(0,14)}…${s.root.slice(-6)}</td><td>${s.tx?`<a class="pill on" href="https://robinhoodchain.blockscout.com/tx/${s.tx}" target="_blank">tx ↗</a>`:'<span class="pill">pending</span>'}</td><td><a href="/registry/${s.file}" class="small">json</a></td></tr>`).join(''):'<tr><td colspan="7" class="small">No snapshots yet — the first one is produced by the next daily run.</td></tr>';
+$('#snap').innerHTML=rows.map(s=>`<option value="${s.file}">${new Date(s.asOf*1000).toISOString().slice(0,10)} · ${s.size} wallets</option>`).join('')||'<option>—</option>'}
+$('#profile').onchange=render;
+$('#go').onclick=async()=>{const f=$('#snap').value,a=$('#addr').value.trim().toLowerCase();const R=$('#res');if(!/^0x[0-9a-f]{40}$/.test(a))return R.innerHTML='<span class="bad">Not an address.</span>';let s;try{s=await (await fetch('/registry/'+f)).json()}catch{return R.innerHTML='<span class="bad">Snapshot not found.</span>'}
+const proof=s.proofs&&s.proofs[a];if(!proof)return R.innerHTML=`<span class="bad">Not in this snapshot</span> <span class="small">(${a.slice(0,8)}… was not a member as of ${new Date(s.asOf*1000).toISOString().slice(0,10)})</span>`;
+const ok=verify(s.root,a,proof);R.innerHTML=ok?`<span class="ok">Member — proof verifies against root ${s.root.slice(0,12)}…</span> <span class="small">(${proof.length} hashes)</span>`:'<span class="bad">Proof does not match the root.</span>'};
+load();
+</script></body></html>

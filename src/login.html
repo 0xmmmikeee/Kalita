@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kalita — sign in</title><link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#17161A;--card:#232229;--ink:#F4EFE6;--mut:#A9A5B2;--acc:#B5602B}
+body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--ink);font-family:Manrope,system-ui,sans-serif}
+.card{width:min(440px,92vw);background:var(--card);border:1px solid rgba(244,239,230,.1);border-radius:20px;padding:36px;box-sizing:border-box}
+.logo{display:flex;align-items:center;gap:12px;margin-bottom:22px}.logo b{font-size:28px;font-weight:800;letter-spacing:-1px}
+h1{font-size:22px;margin:0 0 8px}p{color:var(--mut);font-size:14px;line-height:1.5;margin:0 0 22px}
+button{width:100%;padding:14px;border:0;border-radius:12px;font:600 15px Manrope,sans-serif;cursor:pointer;background:var(--acc);color:var(--ink);margin-bottom:10px}
+button.sec{background:transparent;border:1px solid rgba(244,239,230,.2)}button:disabled{opacity:.5;cursor:wait}
+.err{color:#ff8a8a;font-size:13px;min-height:18px;margin-top:8px}.small{font-size:12px;color:var(--mut);margin-top:18px}
+</style></head><body>
+<div class="card">
+<div class="logo"><svg width="36" height="36" viewBox="0 0 64 64"><circle cx="32" cy="32" r="25" fill="none" stroke="#F4EFE6" stroke-width="6"/><path d="M32 9 40 32 32 34.5 24 32Z" fill="#B5602B"/><path d="M32 55 24 32 32 34.5 40 32Z" fill="#F4EFE6"/><circle cx="32" cy="32" r="3.5" fill="#17161A"/></svg><b>kalita</b></div>
+<h1>Sign in with your wallet</h1>
+<p>Your address is your account. Signing a message proves you own it — no transaction, no gas, no password.</p>
+<button id="mm">Continue with MetaMask</button>
+<button id="ph" class="sec">Continue with Phantom</button>
+<button id="any" class="sec">Other injected wallet</button>
+<a id="gg" href="/auth/google" class="sec" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:14px;border-radius:12px;font:600 15px Manrope,sans-serif;background:#F4EFE6;color:#17161A;text-decoration:none;box-sizing:border-box;margin-bottom:10px"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.6 30.1 0 24 0 14.6 0 6.5 5.4 2.6 13.3l7.8 6C12.3 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z"/><path fill="#FBBC05" d="M10.4 28.7A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.8-6A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.7l7.8-6z"/><path fill="#34A853" d="M24 48c6.1 0 11.6-2 15.4-5.5l-7.5-5.8c-2.1 1.4-4.8 2.3-7.9 2.3-6.3 0-11.7-4.1-13.6-9.8l-7.8 6C6.5 42.6 14.6 48 24 48z"/></svg>Continue with Google</a>
+<div class="err" id="err"></div>
+<div style="display:flex;align-items:center;gap:12px;margin:18px 0 14px;color:var(--mut);font-size:12px"><span style="flex:1;height:1px;background:rgba(244,239,230,.15)"></span>or continue with email<span style="flex:1;height:1px;background:rgba(244,239,230,.15)"></span></div>
+<form id="ef" style="display:flex;gap:8px"><input id="em" type="email" placeholder="you@example.com" required style="flex:1;padding:13px 14px;border-radius:12px;border:1px solid rgba(244,239,230,.2);background:transparent;color:var(--ink);font:500 15px Manrope,sans-serif;min-width:0"><button type="submit" id="eb" style="width:auto;margin:0;padding:13px 18px">Send link</button></form>
+<div class="err" id="eerr"></div>
+<div class="small">The first wallet to sign in becomes the administrator. The panel stays read-only for other users.</div>
+</div>
+<script>
+const err=m=>document.getElementById('err').textContent=m||'';
+function provider(kind){
+  const eth=window.ethereum, ph=window.phantom&&window.phantom.ethereum;
+  if(kind==='ph') return ph||(eth&&eth.isPhantom?eth:null);
+  if(kind==='mm'){ if(eth&&eth.providers) return eth.providers.find(p=>p.isMetaMask)||eth; return eth&&(eth.isMetaMask||!eth.isPhantom)?eth:eth; }
+  return eth||ph;
+}
+async function login(kind){
+  err(''); const btns=[...document.querySelectorAll('button')]; btns.forEach(b=>b.disabled=true);
+  try{
+    const pv=provider(kind); if(!pv) throw new Error(kind==='ph'?'Phantom not found — install it or use another wallet':'No wallet found — install MetaMask or Phantom');
+    const [addr]=await pv.request({method:'eth_requestAccounts'});
+    const {message}=await (await fetch('/auth/nonce')).json();
+    const signature=await pv.request({method:'personal_sign',params:[message,addr]});
+    const r=await fetch('/auth/verify',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({address:addr,message,signature})});
+    const j=await r.json(); if(!r.ok) throw new Error(j.error||'sign-in failed');
+    location.href='/';
+  }catch(e){ err(e.message||String(e)); } finally{ btns.forEach(b=>b.disabled=false); }
+}
+(async()=>{try{const c=await (await fetch('/auth/config')).json();if(!c.google){const g=document.getElementById('gg');g.style.opacity=.45;g.style.pointerEvents='none';g.textContent='Google sign-in — coming soon';}if(!c.email){document.getElementById('eb').disabled=true;document.getElementById('eerr').textContent='Email sign-in is coming soon.';}}catch{}})();
+document.getElementById('ef').onsubmit=async e=>{e.preventDefault();const b=document.getElementById('eb'),o=document.getElementById('eerr');o.textContent='';b.disabled=true;try{const r=await fetch('/auth/email/request',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:document.getElementById('em').value})});const j=await r.json();if(!r.ok)throw new Error(j.error||'failed');o.style.color='#7fd39a';o.textContent='Check your inbox — the link is valid for 15 minutes.';}catch(x){o.style.color='#ff8a8a';o.textContent=x.message;}finally{b.disabled=false;}};
+document.getElementById('mm').onclick=()=>login('mm');document.getElementById('ph').onclick=()=>login('ph');document.getElementById('any').onclick=()=>login('any');
+</script></body></html>

@@ -1,0 +1,22 @@
+{
+"n": "Number of signals (first buys) of this wallet in the selection period",
+"raw": "Share of signals that hit (fast: ×2 within 1 h; picker: pool or ×5 in 24 h, ≥×1.5 from our entry)",
+"p_exp": "Expected hit rate for a random buyer at the same curve positions as this wallet",
+"low": "Wilson 80% lower bound of the hit rate — the pessimistic reading",
+"excess": "Lower bound minus expected: the edge over the market. The main criterion.",
+"lift": "Raw hit rate divided by expected",
+"rug": "Share of signals where the price fell below 0.2× within 10 minutes",
+"med_rank": "Median position among the token’s buyers (5 = usually the 5th buyer)",
+"med_curve_frac": "Median share of the graduation threshold already collected when the wallet bought",
+"med_ath_1h": "Median peak within 1 h relative to our entry 2 s after the wallet",
+"med_t_ath_1h": "Median time from entry to the 1-hour peak",
+"med_ath_24h": "Median peak within 24 h",
+"mean_ath_24h": "Mean peak within 24 h — sensitive to the tail (×10+)",
+"best_share_24h": "Share of the wallet’s total 24 h gain coming from its single best signal (lower = more consistent)",
+"grad_rate": "Share of the wallet’s tokens that graduated to a pool",
+"p_x5_24h": "Share of signals reaching ×5 within 24 h",
+"val_n": "Signals in the validation period (last 7 days, not used for selection)",
+"val_raw": "Hit rate on the validation period — the number that catches luck",
+"sigs_per_day": "Average signals per day",
+"flag": "contract = address has code; check-code / eoa-bot = suspected bot"
+}

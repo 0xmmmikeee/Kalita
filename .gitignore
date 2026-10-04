@@ -1,0 +1,13 @@
+data/
+state/
+node_modules/
+*.log
+.env
+.env.*
+!.env.example
+__pycache__/
+contracts/out/
+contracts/cache/
+contracts/lib/
+contracts/broadcast/
+tools/i18n/OpenCC/
